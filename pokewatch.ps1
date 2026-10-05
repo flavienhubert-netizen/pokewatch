@@ -21,6 +21,8 @@ $TopicFile = Join-Path $PSScriptRoot 'ntfy_topic.txt'
 $Topic = if ($env:NTFY_TOPIC) { $env:NTFY_TOPIC.Trim() }
          elseif (Test-Path $TopicFile) { (Get-Content $TopicFile -Raw).Trim() }
          else { $cfg.ntfy_topic }
+# Un nom de canal ntfy ne contient que lettres, chiffres, - et _ : on retire tout caractère parasite (BOM, retour ligne...)
+if ($Topic) { $Topic = $Topic -replace '[^A-Za-z0-9_-]', '' }
 
 $UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36'
 $Inv = [Globalization.CultureInfo]::InvariantCulture
