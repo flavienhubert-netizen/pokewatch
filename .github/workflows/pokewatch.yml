@@ -2,25 +2,32 @@ name: PokeWatch
 
 on:
   schedule:
-    # Toutes les 15 min (minutes décalées : GitHub est surchargé pile à l'heure)
+    # Vérification toutes les 15 min (minutes décalées : GitHub est surchargé pile à l'heure)
     - cron: '7,22,37,52 * * * *'
+    # Récap 9h30 et 16h30 heure de Paris. GitHub compte en heure UTC : on lance aux deux décalages
+    # possibles (heure d'été / d'hiver) et le script n'envoie que celui qui tombe à la bonne heure.
+    - cron: '30 7,8,14,15 * * *'
   workflow_dispatch:
     inputs:
       test:
         description: 'Envoyer une notification de test'
         type: boolean
         default: false
+      recap:
+        description: 'Envoyer un récap maintenant'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
-
-concurrency:
-  group: pokewatch
 
 jobs:
   check:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    # Récap et vérification ont chacun leur file : l'un ne peut pas annuler l'autre
+    concurrency:
+      group: pokewatch-${{ (github.event.schedule == '30 7,8,14,15 * * *' || inputs.recap) && 'recap' || 'check' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,15 +39,24 @@ jobs:
         run: ./pokewatch.ps1 -Cloud -Test
 
       - name: Vérifier les boutiques
+        if: ${{ github.event.schedule != '30 7,8,14,15 * * *' && !inputs.recap }}
         shell: pwsh
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: ./pokewatch.ps1 -Cloud
 
+      - name: Récap du jour
+        if: ${{ github.event.schedule == '30 7,8,14,15 * * *' || inputs.recap }}
+        shell: pwsh
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: ./pokewatch.ps1 -Cloud -Recap ${{ inputs.recap && '-Force' || '' }}
+
       - name: Mémoriser ce qui a déjà été signalé
         run: |
-          [ -f etat-cloud.json ] || exit 0
+          for f in etat-cloud.json journal-cloud.json recap-cloud.json; do if [ -f "$f" ]; then git add "$f"; fi; done
+          git diff --cached --quiet && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add etat-cloud.json
-          git diff --cached --quiet || (git commit -m "Mise à jour de l'état" && git push)
+          git commit -m "Mise à jour de l'état"
+          git pull --rebase -q && git push

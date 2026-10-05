@@ -5,8 +5,9 @@
 # Tester les alertes :  powershell -ExecutionPolicy Bypass -File pokewatch.ps1 -Test
 # Voir l'état actuel :  powershell -ExecutionPolicy Bypass -File pokewatch.ps1 -Check   (un passage, sans alerte)
 # Mode GitHub :         pwsh pokewatch.ps1 -Cloud   (un seul passage, notifications téléphone uniquement)
+# Récap du jour :       pwsh pokewatch.ps1 -Cloud -Recap   (9h30 et 16h30 ; -Force pour l'envoyer tout de suite)
 
-param([switch]$Test, [switch]$Check, [switch]$Cloud)
+param([switch]$Test, [switch]$Check, [switch]$Cloud, [switch]$Recap, [switch]$Force)
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -14,6 +15,9 @@ if (-not $Cloud) { Add-Type -AssemblyName System.Windows.Forms, System.Drawing }
 
 $ConfigPath = Join-Path $PSScriptRoot 'config.json'
 $StatePath  = Join-Path $PSScriptRoot $(if ($Cloud) { 'etat-cloud.json' } else { 'etat.json' })
+# Journal des alertes envoyées (lu par le récap) : un fichier pour GitHub, un pour le PC
+$JournalPath = Join-Path $PSScriptRoot $(if ($Cloud) { 'journal-cloud.json' } else { 'journal-pc.json' })
+$RecapPath   = Join-Path $PSScriptRoot 'recap-cloud.json'
 $cfg = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
 # Le nom du canal ntfy reste privé : variable d'environnement (secret GitHub) ou fichier local non publié
@@ -183,13 +187,14 @@ function Show-Toast($title, $msg) {
     $script:LastIcon = $n
 }
 
-function Send-Ntfy($title, $msg, $url, $urgent) {
+function Send-Ntfy($title, $msg, $url, $urgent, $tags) {
     if (-not $Topic) { return }
     # En-tête encodé (RFC 2047) pour garder les accents dans le titre
     $t64 = '=?UTF-8?B?' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($title)) + '?='
-    $headers = @{ Title = $t64; Click = $url
-                  Priority = $(if ($urgent) { 'urgent' } else { 'default' })
-                  Tags = $(if ($urgent) { 'rotating_light' } else { 'eyes' }) }
+    if (-not $tags) { $tags = if ($urgent) { 'rotating_light' } else { 'eyes' } }
+    $headers = @{ Title = $t64; Tags = $tags
+                  Priority = $(if ($urgent) { 'urgent' } else { 'default' }) }
+    if ($url) { $headers.Click = $url }
     try {
         Invoke-RestMethod -Method Post -Uri "https://ntfy.sh/$Topic" `
             -Body ([Text.Encoding]::UTF8.GetBytes($msg)) -Headers $headers | Out-Null
@@ -235,6 +240,115 @@ function Save-State($s) {
     $o | ConvertTo-Json | Out-File $StatePath -Encoding utf8
 }
 
+# ---------- Journal des alertes (pour le récap) ----------
+
+$script:NewEvents = @()
+
+# PowerShell 7 transforme les dates JSON en DateTime, PowerShell 5 les laisse en texte : on gère les deux
+function Get-EventTime($e) {
+    if ($e.t -is [DateTime]) { return $e.t.ToUniversalTime() }
+    return [DateTime]::Parse($e.t, $Inv, [Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+}
+
+function Read-Journal($path) {
+    if (Test-Path $path) { foreach ($e in (Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json)) { $e } }
+}
+
+function Add-JournalEvent($it, $kind) {
+    $script:NewEvents += [pscustomobject]@{
+        t = [DateTime]::UtcNow.ToString('o'); kind = $kind; shop = $it.shop
+        title = $it.title; price = $it.price; url = ($it.url -replace '#[a-z]+$', '') }
+}
+
+# Ajoute les nouvelles alertes au journal (on garde 3 jours). Renvoie $true s'il a changé.
+function Save-Journal {
+    if ($script:NewEvents.Count -eq 0) { return $false }
+    $limit = [DateTime]::UtcNow.AddDays(-3)
+    $all = @(@(Read-Journal $JournalPath) + $script:NewEvents | Where-Object { (Get-EventTime $_) -gt $limit } |
+        ForEach-Object { [pscustomobject]@{ t = (Get-EventTime $_).ToString('o'); kind = $_.kind; shop = $_.shop
+                                            title = $_.title; price = $_.price; url = $_.url } })
+    ConvertTo-Json -InputObject $all -Depth 3 | Out-File $JournalPath -Encoding utf8
+    $script:NewEvents = @()
+    return $true
+}
+
+# Le PC envoie son journal sur GitHub pour que le récap inclue aussi ses alertes
+function Sync-PcJournal {
+    if (-not (Test-Path (Join-Path $PSScriptRoot '.git'))) { return }
+    $git = (Get-Command git -ErrorAction SilentlyContinue).Source
+    if (-not $git) { $git = 'C:\Program Files\Git\cmd\git.exe' }
+    $ErrorActionPreference = 'Continue'
+    Push-Location $PSScriptRoot
+    try {
+        & $git add journal-pc.json *> $null
+        & $git commit -q -m "Journal du PC" *> $null
+        & $git pull -q --rebase --autostash *> $null
+        & $git push -q *> $null
+        if ($LASTEXITCODE -ne 0) { Log "Journal non envoyé sur GitHub : le prochain récap ne verra pas ces alertes du PC." }
+    } finally { Pop-Location }
+}
+
+function ConvertTo-Paris($utc) {
+    foreach ($id in 'Europe/Paris', 'Romance Standard Time') {
+        try { return [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId($utc, $id) } catch { }
+    }
+    return $utc.AddHours(1)
+}
+
+function Format-Hour($d) { '{0:HH}h{0:mm}' -f $d }
+
+# ---------- Récap de 9h30 et 16h30 ----------
+
+function Send-Recap {
+    $nowUtc = [DateTime]::UtcNow
+    $now = ConvertTo-Paris $nowUtc
+    $mins = $now.Hour * 60 + $now.Minute
+    # GitHub lance parfois ses tâches en retard : on accepte une marge après l'heure prévue
+    if ($Force) { $slot = 'test'; $label = 'Récap (test)' }
+    elseif ($mins -ge 9 * 60 + 15 -and $mins -lt 12 * 60) { $slot = 'matin'; $label = 'Récap 9h30' }
+    elseif ($mins -ge 16 * 60 + 15 -and $mins -lt 19 * 60) { $slot = 'aprem'; $label = 'Récap 16h30' }
+    else { Log "Pas l'heure d'un récap ($(Format-Hour $now) à Paris)."; return }
+
+    $key = '{0:yyyy-MM-dd}-{1}' -f $now, $slot
+    $rs = if (Test-Path $RecapPath) { Get-Content $RecapPath -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
+    if (-not $Force -and $rs -and $rs.last_slot -eq $key) { Log "Récap $key déjà envoyé."; return }
+
+    $since = if ($rs -and $rs.last_time) { Get-EventTime ([pscustomobject]@{ t = $rs.last_time }) }
+             else { $nowUtc.AddHours($(if ($slot -eq 'matin') { -17 } else { -7 })) }
+    $events = @(@(foreach ($f in 'journal-cloud.json', 'journal-pc.json') { Read-Journal (Join-Path $PSScriptRoot $f) }) |
+                Where-Object { (Get-EventTime $_) -gt $since } | Sort-Object { Get-EventTime $_ })
+
+    $sinceP = ConvertTo-Paris $since
+    $sinceTxt = if ($sinceP.Date -eq $now.Date) { "Depuis $(Format-Hour $sinceP)" }
+                elseif ($sinceP.Date -eq $now.Date.AddDays(-1)) { "Depuis hier $(Format-Hour $sinceP)" }
+                else { "Depuis le {0:dd/MM} à $(Format-Hour $sinceP)" -f $sinceP }
+    $nShops = @($cfg.shops | Where-Object enabled).Count
+
+    if ($events.Count -eq 0) {
+        $title = "$label : aucun pack aujourd'hui"
+        $msg = "$sinceTxt, rien de nouveau sur les $nShops boutiques (UPC et ETB 30 ans). La surveillance continue."
+        $click = $null; $tags = 'zzz'
+    } else {
+        $dispo = @($events | Where-Object { $_.kind -eq 'dispo' })
+        $news  = @($events | Where-Object { $_.kind -eq 'annonce' })
+        $title = "$label : $($dispo.Count) dispo, $($news.Count) nouvelle(s) annonce(s)"
+        $lines = foreach ($e in $events | Select-Object -First 15) {
+            $icon = if ($e.kind -eq 'dispo') { '🟢' } else { '🆕' }
+            "$icon $(Format-Hour (ConvertTo-Paris (Get-EventTime $e))) $($e.shop) - $($e.title) - $(Format-Price $e.price)"
+        }
+        if ($events.Count -gt 15) { $lines += "... et $($events.Count - 15) autre(s)" }
+        $msg = "$sinceTxt :`n" + ($lines -join "`n")
+        $click = if ($dispo) { $dispo[-1].url } else { $events[-1].url }
+        $tags = 'package'
+    }
+
+    Log "$title`n$msg"
+    Send-Ntfy $title $msg $click $false $tags
+    if (-not $Force) {
+        [pscustomobject]@{ last_slot = $key; last_time = $nowUtc.ToString('o') } | ConvertTo-Json | Out-File $RecapPath -Encoding utf8
+    }
+}
+
 # ---------- Programme principal ----------
 
 if ($Test) {
@@ -244,6 +358,8 @@ if ($Test) {
     if ($script:LastIcon) { $script:LastIcon.Dispose() }
     return
 }
+
+if ($Recap) { Send-Recap; return }
 
 $shops = @($cfg.shops | Where-Object enabled)
 # Sur GitHub : pas de navigateur, donc pas de grandes enseignes. Sur le PC, si GitHub surveille
@@ -278,14 +394,16 @@ while ($true) {
             foreach ($it in Get-ShopListings $s) {
                 $found++
                 $known = $state.ContainsKey($it.url)
-                if ($it.ok -and -not ($known -and $state[$it.url])) { Send-Alert $it }
-                elseif (-not $known -and -not $firstRun) { Send-Alert $it -NewListing }
+                if ($it.ok -and -not ($known -and $state[$it.url])) { Send-Alert $it; Add-JournalEvent $it 'dispo' }
+                elseif (-not $known -and -not $firstRun) { Send-Alert $it -NewListing; Add-JournalEvent $it 'annonce' }
                 $state[$it.url] = [bool]$it.ok
             }
         } catch { Log "$($s.name) : $($_.Exception.Message)" }
         Start-Sleep -Milliseconds (Get-Random -Minimum 500 -Maximum 1500)
     }
     Save-State $state
+    $journalChanged = Save-Journal
+    if ($journalChanged -and -not $Cloud) { Sync-PcJournal }
     if ($Cloud) { Log "Tour terminé : $found annonce(s) 30 ans suivies."; break }
     $firstRun = $false
     Log "Tour terminé : $found annonce(s) 30 ans suivies. Prochain passage dans $interval min."
