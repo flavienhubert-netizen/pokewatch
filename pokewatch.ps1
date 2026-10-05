@@ -246,8 +246,9 @@ if ($Test) {
 $shops = @($cfg.shops | Where-Object enabled)
 # Sur GitHub : pas de navigateur, donc pas de grandes enseignes. Sur le PC, si GitHub surveille
 # déjà les boutiques spécialisées, le PC ne garde que les grandes enseignes (pas de double alerte).
-if ($Cloud) { $shops = @($shops | Where-Object { $_.type -ne 'page' }) }
-elseif ($cfg.cloud_handles_shops -and -not $Check) { $shops = @($shops | Where-Object { $_.type -eq 'page' }) }
+# Les boutiques "pc_only" refusent les serveurs de GitHub : c'est le PC qui s'en charge.
+if ($Cloud) { $shops = @($shops | Where-Object { $_.type -ne 'page' -and -not $_.pc_only }) }
+elseif ($cfg.cloud_handles_shops -and -not $Check) { $shops = @($shops | Where-Object { $_.type -eq 'page' -or $_.pc_only }) }
 
 if ($Check) {
     foreach ($s in $shops) {

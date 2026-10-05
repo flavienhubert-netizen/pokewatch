@@ -1,7 +1,7 @@
 {
   "interval_minutes": 15,
   "open_browser_on_stock": true,
-  "cloud_handles_shops": false,
+  "cloud_handles_shops": true,
 
   "watches": [
     { "id": "upc", "name": "UPC 30 ans", "enabled": true, "max_price": 275,
@@ -26,7 +26,7 @@
     { "name": "GM Cards And Toys",    "type": "shopify", "host": "gmcardsandtoys.com",         "enabled": true },
     { "name": "Le Flamboyant TCG",    "type": "shopify", "host": "leflamboyanttcg.fr",         "enabled": true },
     { "name": "MatooCorp",            "type": "shopify", "host": "matoocorp.fr",               "enabled": true },
-    { "name": "PokeMom's",            "type": "woo",     "host": "pokemoms.fr",                "enabled": true },
+    { "name": "PokeMom's",            "type": "woo",     "host": "pokemoms.fr",                "enabled": true, "pc_only": true },
     { "name": "Lilie Collections",    "type": "woo",     "host": "liliecollections.com",       "enabled": true },
     { "name": "PikaStore",            "type": "presta",  "host": "www.pikastore.fr",           "enabled": true },
 
