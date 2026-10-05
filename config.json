@@ -1,0 +1,42 @@
+{
+  "interval_minutes": 15,
+  "open_browser_on_stock": true,
+  "cloud_handles_shops": false,
+
+  "watches": [
+    { "id": "upc", "name": "UPC 30 ans", "enabled": true, "max_price": 275,
+      "queries": ["ultra premium 30", "ultra premium mentali", "ultra premium noctali"] },
+    { "id": "etb", "name": "ETB 30 ans", "enabled": true, "max_price": 85,
+      "queries": ["dresseur elite 30", "etb 30"] }
+  ],
+
+  "shops": [
+    { "name": "Vcollect",             "type": "shopify", "host": "www.vcollect.fr",            "enabled": true },
+    { "name": "Hikaru Distribution",  "type": "shopify", "host": "hikarudistribution.com",     "enabled": true },
+    { "name": "Poke-Geek",            "type": "shopify", "host": "www.poke-geek.fr",           "enabled": true },
+    { "name": "Cardsity",             "type": "shopify", "host": "cardsity.com",               "enabled": true },
+    { "name": "MasterSet",            "type": "shopify", "host": "masterset.store",            "enabled": true },
+    { "name": "LectorShop",           "type": "shopify", "host": "lectorshop.com",             "enabled": true },
+    { "name": "Papa a Plein Temps",   "type": "shopify", "host": "papa-a-plein-temps.com",     "enabled": true },
+    { "name": "TcgSpeed",             "type": "shopify", "host": "www.tcgspeed.com",           "enabled": true },
+    { "name": "Kairyu",               "type": "shopify", "host": "kairyu.fr",                  "enabled": true },
+    { "name": "VegaStore",            "type": "shopify", "host": "www.vegastore.fr",           "enabled": true },
+    { "name": "Kyoriyu",              "type": "shopify", "host": "kyoriyu.fr",                 "enabled": true },
+    { "name": "MasterShopTCG",        "type": "shopify", "host": "mastershoptcg.com",          "enabled": true },
+    { "name": "GM Cards And Toys",    "type": "shopify", "host": "gmcardsandtoys.com",         "enabled": true },
+    { "name": "Le Flamboyant TCG",    "type": "shopify", "host": "leflamboyanttcg.fr",         "enabled": true },
+    { "name": "MatooCorp",            "type": "shopify", "host": "matoocorp.fr",               "enabled": true },
+    { "name": "PokeMom's",            "type": "woo",     "host": "pokemoms.fr",                "enabled": true },
+    { "name": "Lilie Collections",    "type": "woo",     "host": "liliecollections.com",       "enabled": true },
+    { "name": "PikaStore",            "type": "presta",  "host": "www.pikastore.fr",           "enabled": true },
+
+    { "name": "Micromania", "type": "page", "browser": true,  "watches": ["upc"], "enabled": true,
+      "url": "https://www.micromania.fr/on/demandware.store/Sites-Micromania-Site/fr_FR/Search-Show?q=pokemon+ultra+premium" },
+    { "name": "Cultura",    "type": "page", "browser": true,  "watches": ["upc"], "enabled": true,
+      "url": "https://www.cultura.com/search/results?search_query=pokemon%20ultra%20premium" },
+    { "name": "Philibert",  "type": "page", "browser": false, "watches": ["upc"], "enabled": true,
+      "url": "https://www.philibertnet.com/fr/recherche?search_query=pokemon+ultra+premium" },
+    { "name": "Amazon.fr",  "type": "page", "browser": true,  "watches": ["upc"], "enabled": true,
+      "url": "https://www.amazon.fr/s?k=pokemon+ultra+premium" }
+  ]
+}
