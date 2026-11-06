@@ -1,26 +1,18 @@
 [
   {
-    "t": "2026-10-30T20:41:30.2582789Z",
+    "t": "2026-11-06T16:15:15.8106159Z",
     "kind": "annonce",
-    "shop": "MasterSet",
-    "title": "[Précommande] [Limite 1] Pokémon - Coffret Collection Ultra-Premium (UPC) : Journée (Mentali) - 30e Anniversaire",
-    "price": 300.0,
-    "url": "https://masterset.store/products/pok-mon-coffret-collection-ultra-premium-upc-journ-e-mentali-30e-anniversaire"
+    "shop": "TcgSpeed",
+    "title": "Coffret Collection Ultra Premium Pokémon 30 Ans – Mentali-ex – 30 Boosters – Version Française",
+    "price": 499.0,
+    "url": "https://www.tcgspeed.com/products/coffret-ultra-premium-pokemon-30-ans-mentali-ex"
   },
   {
-    "t": "2026-10-30T20:41:30.3742730Z",
+    "t": "2026-11-06T16:15:15.9483296Z",
     "kind": "annonce",
-    "shop": "MasterSet",
-    "title": "[Précommande] [Limite 1] Pokémon - Coffret Collection Ultra-Premium (UPC) : Soirée (Noctali) - 30e Anniversaire",
-    "price": 300.0,
-    "url": "https://masterset.store/products/pok-mon-coffret-collection-ultra-premium-upc-soir-e-noctali-30e-anniversaire"
-  },
-  {
-    "t": "2026-11-02T11:38:35.0002509Z",
-    "kind": "annonce",
-    "shop": "Kairyu",
-    "title": "[SCELLE] Ultra Premium 30 Ans - Mentali [FR]",
-    "price": 249.9,
-    "url": "https://kairyu.fr/products/scelle-ultra-premium-30-ans-mentali-fr"
+    "shop": "TcgSpeed",
+    "title": "Pokémon – Coffret Collection Ultra Premium 30 Ans – Soirée – Noctali-ex – Version Française",
+    "price": 499.0,
+    "url": "https://www.tcgspeed.com/products/coffret-ultra-premium-pokemon-30-ans-noctali-ex-soiree"
   }
 ]
